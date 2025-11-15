@@ -29,6 +29,18 @@ const upload = multer({ dest: options.cache });
 let inventory = [];
 let nextId = 1;
 
+app.get('/inventory', (req, res) => {
+  const result = inventory.map(item => ({
+    id: item.id,
+    inventory_name: item.inventory_name,
+    description: item.description,
+    photoUrl: item.photoFilename ? `/inventory/${item.id}/photo` : null
+  }));
+
+  res.json(result);
+});
+
+
 app.post('/register', upload.single('photo'), (req, res) => {
   const name = req.body.inventory_name;
   const description = req.body.description || '';
