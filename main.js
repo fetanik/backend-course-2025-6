@@ -29,6 +29,15 @@ const upload = multer({ dest: options.cache });
 let inventory = [];
 let nextId = 1;
 
+app.get('/RegisterForm.html', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'RegisterForm.html'));
+});
+
+app.get('/SearchForm.html', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'SearchForm.html'));
+});
+
+
 app.get('/inventory', (req, res) => {
   const result = inventory.map(item => ({
     id: item.id,
@@ -132,6 +141,59 @@ app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
     photoUrl: `/inventory/${item.id}/photo`
   });
 });
+
+app.get('/search', (req, res) => {
+  const id = parseInt(req.query.id, 10);
+
+  if (Number.isNaN(id)) {
+    return res.status(400).send('Invalid id');
+  }
+
+  const item = inventory.find(i => i.id === id);
+
+  if (!item) {
+    return res.status(404).send('Item not found');
+  }
+
+  let description = item.description || '';
+  let photoBlock = '';
+
+  if (req.query.includePhoto !== undefined && item.photoFilename) {
+    const photoUrl = `/inventory/${item.id}/photo`;
+
+    if (description) {
+      description += '<br>';
+    }
+    description += `Photo link: <a href="${photoUrl}">${photoUrl}</a>`;
+
+    photoBlock = `
+      <p>
+        <img src="${photoUrl}"
+             alt="photo of ${item.inventory_name}"
+             style="max-width:300px;">
+      </p>
+    `;
+  }
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Search result</title>
+    </head>
+    <body>
+      <h1>Search result</h1>
+      <p><strong>ID:</strong> ${item.id}</p>
+      <p><strong>Name:</strong> ${item.inventory_name}</p>
+      <p><strong>Description:</strong><br>${description}</p>
+      ${photoBlock}
+      <p><a href="/SearchForm.html">Back to search</a></p>
+    </body>
+    </html>
+  `);
+});
+
 
 app.post('/register', upload.single('photo'), (req, res) => {
   const name = req.body.inventory_name;
