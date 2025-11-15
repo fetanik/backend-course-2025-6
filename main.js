@@ -40,6 +40,22 @@ app.get('/inventory', (req, res) => {
   res.json(result);
 });
 
+app.get('/inventory/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const item = inventory.find(i => i.id === id);
+
+  if (!item) {
+    return res.status(404).json({ error: 'not found' });
+  }
+
+  res.json({
+    id: item.id,
+    inventory_name: item.inventory_name,
+    description: item.description,
+    photoUrl: item.photoFilename ? `/inventory/${item.id}/photo` : null
+  });
+});
+
 
 app.post('/register', upload.single('photo'), (req, res) => {
   const name = req.body.inventory_name;
