@@ -4,6 +4,8 @@ const http = require('http');
 const path = require('path');
 const express = require('express');
 const multer = require('multer');
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
 
 const program = new Command();
 
@@ -27,6 +29,40 @@ app.use(express.urlencoded({ extended: false }));
 const upload = multer({ dest: options.cache });
 
 let inventory = [];
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     InventoryItem:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         inventory_name:
+ *           type: string
+ *         description:
+ *           type: string
+ *         photoUrl:
+ *           type: string
+ *           nullable: true
+ */
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Inventory Service',
+      version: '1.0.0',
+      description: 'Simple inventory API for lab work',
+    },
+  },
+  apis: [__filename],
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 let nextId = 1;
 
 app.all('/register', (req, res, next) => {
@@ -70,7 +106,21 @@ app.get('/SearchForm.html', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'SearchForm.html'));
 });
 
-
+/**
+ * @swagger
+ * /inventory:
+ *   get:
+ *     summary: Get all inventory items
+ *     responses:
+ *       200:
+ *         description: List of inventory items
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/InventoryItem'
+ */
 app.get('/inventory', (req, res) => {
   const result = inventory.map(item => ({
     id: item.id,
@@ -82,6 +132,27 @@ app.get('/inventory', (req, res) => {
   res.json(result);
 });
 
+/**
+ * @swagger
+ * /inventory/{id}:
+ *   get:
+ *     summary: Get inventory item by id
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Inventory item
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/InventoryItem'
+ *       404:
+ *         description: Not found
+ */
 app.get('/inventory/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const item = inventory.find(i => i.id === id);
@@ -98,6 +169,38 @@ app.get('/inventory/:id', (req, res) => {
   });
 });
 
+/**
+ * @swagger
+ * /inventory/{id}:
+ *   put:
+ *     summary: Update inventory item
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               inventory_name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Updated item
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/InventoryItem'
+ *       404:
+ *         description: Not found
+ */
 app.put('/inventory/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const item = inventory.find(i => i.id === id);
@@ -124,6 +227,28 @@ app.put('/inventory/:id', (req, res) => {
   });
 });
 
+/**
+ * @swagger
+ * /inventory/{id}/photo:
+ *   get:
+ *     summary: Get photo for inventory item
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Photo file
+ *         content:
+ *           image/jpeg:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Photo not found
+ */
 app.get('/inventory/:id/photo', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const item = inventory.find(i => i.id === id);
@@ -143,6 +268,37 @@ app.get('/inventory/:id/photo', (req, res) => {
   stream.pipe(res);
 });
 
+/**
+ * @swagger
+ * /inventory/{id}/photo:
+ *   put:
+ *     summary: Upload or replace photo for inventory item
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Item with updated photo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/InventoryItem'
+ *       404:
+ *         description: Not found
+ */
 app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
   const id = parseInt(req.params.id, 10);
   const item = inventory.find(i => i.id === id);
@@ -175,6 +331,32 @@ app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
   });
 });
 
+/**
+ * @swagger
+ * /search:
+ *   get:
+ *     summary: Search inventory item by id (HTML response)
+ *     parameters:
+ *       - in: query
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: includePhoto
+ *         required: false
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: HTML page with search result
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ *       404:
+ *         description: Item not found
+ */
 app.get('/search', (req, res) => {
   const id = parseInt(req.query.id, 10);
 
@@ -227,6 +409,37 @@ app.get('/search', (req, res) => {
   `);
 });
 
+/**
+ * @swagger
+ * /register:
+ *   post:
+ *     summary: Register new inventory item
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               inventory_name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *             required:
+ *               - inventory_name
+ *     responses:
+ *       201:
+ *         description: Created item
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/InventoryItem'
+ *       400:
+ *         description: Bad request
+ */
 
 app.post('/register', upload.single('photo'), (req, res) => {
   const name = req.body.inventory_name;
@@ -263,6 +476,27 @@ server.listen(options.port, options.host, () => {
   console.log(`Cache directory: ${path.resolve(options.cache)}`);
 });
 
+/**
+ * @swagger
+ * /inventory/{id}:
+ *   delete:
+ *     summary: Delete inventory item
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Deleted item
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/InventoryItem'
+ *       404:
+ *         description: Not found
+ */
 app.delete('/inventory/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const index = inventory.findIndex(i => i.id === id);
