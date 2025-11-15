@@ -82,6 +82,56 @@ app.put('/inventory/:id', (req, res) => {
   });
 });
 
+app.get('/inventory/:id/photo', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const item = inventory.find(i => i.id === id);
+
+  if (!item || !item.photoFilename) {
+    return res.status(404).json({ error: 'photo not found' });
+  }
+
+  const filePath = path.resolve(options.cache, item.photoFilename);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'photo not found' });
+  }
+
+  res.setHeader('Content-Type', 'image/jpeg');
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
+});
+
+app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const item = inventory.find(i => i.id === id);
+
+  if (!item) {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    return res.status(404).json({ error: 'not found' });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'photo file is required' });
+  }
+
+  if (item.photoFilename) {
+    const oldPath = path.join(options.cache, item.photoFilename);
+    if (fs.existsSync(oldPath)) {
+      fs.unlink(oldPath, () => {});
+    }
+  }
+
+  item.photoFilename = path.basename(req.file.path);
+
+  res.json({
+    id: item.id,
+    inventory_name: item.inventory_name,
+    description: item.description,
+    photoUrl: `/inventory/${item.id}/photo`
+  });
+});
 
 app.post('/register', upload.single('photo'), (req, res) => {
   const name = req.body.inventory_name;
