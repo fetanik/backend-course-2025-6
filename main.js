@@ -29,6 +29,39 @@ const upload = multer({ dest: options.cache });
 let inventory = [];
 let nextId = 1;
 
+app.all('/register', (req, res, next) => {
+  if (req.method === 'POST') return next();
+  res.sendStatus(405);
+});
+
+
+app.all('/inventory', (req, res, next) => {
+  if (req.method === 'GET') return next();
+  res.sendStatus(405);
+});
+
+
+app.all('/inventory/:id', (req, res, next) => {
+  if (req.method === 'GET' || req.method === 'PUT' || req.method === 'DELETE') {
+    return next();
+  }
+  res.sendStatus(405);
+});
+
+
+app.all('/inventory/:id/photo', (req, res, next) => {
+  if (req.method === 'GET' || req.method === 'PUT') {
+    return next();
+  }
+  res.sendStatus(405);
+});
+
+
+app.all('/search', (req, res, next) => {
+  if (req.method === 'GET') return next();
+  res.sendStatus(405);
+});
+
 app.get('/RegisterForm.html', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'RegisterForm.html'));
 });
