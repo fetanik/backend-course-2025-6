@@ -168,3 +168,21 @@ server.listen(options.port, options.host, () => {
   console.log(`Cache directory: ${path.resolve(options.cache)}`);
 });
 
+app.delete('/inventory/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const index = inventory.findIndex(i => i.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'not found' });
+  }
+
+  const item = inventory[index];
+
+  inventory.splice(index, 1);
+
+  res.json({
+    id: item.id,
+    inventory_name: item.inventory_name,
+    description: item.description
+  });
+});
