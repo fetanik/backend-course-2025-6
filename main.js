@@ -56,6 +56,32 @@ app.get('/inventory/:id', (req, res) => {
   });
 });
 
+app.put('/inventory/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const item = inventory.find(i => i.id === id);
+
+  if (!item) {
+    return res.status(404).json({ error: 'not found' });
+  }
+
+  const body = req.body;
+
+  if (typeof body.inventory_name === 'string') {
+    item.inventory_name = body.inventory_name;
+  }
+
+  if (typeof body.description === 'string') {
+    item.description = body.description;
+  }
+
+  res.json({
+    id: item.id,
+    inventory_name: item.inventory_name,
+    description: item.description,
+    photoUrl: item.photoFilename ? `/inventory/${item.id}/photo` : null
+  });
+});
+
 
 app.post('/register', upload.single('photo'), (req, res) => {
   const name = req.body.inventory_name;
