@@ -8,7 +8,6 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 
 const program = new Command();
-
 program
   .requiredOption('-h, --host <host>', 'server host')
   .requiredOption('-p, --port <port>', 'server port')
@@ -16,37 +15,29 @@ program
 
 program.parse(process.argv);
 const options = program.opts();
-
 if (!fs.existsSync(options.cache)) {
   fs.mkdirSync(options.cache, { recursive: true });
 }
 
 const app = express();
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 const upload = multer({ dest: options.cache });
-
 let inventory = [];
+let nextId = 1;
 
-/**
- * @swagger
- * components:
- *   schemas:
- *     InventoryItem:
- *       type: object
- *       properties:
- *         id:
- *           type: integer
- *         inventory_name:
- *           type: string
- *         description:
- *           type: string
- *         photoUrl:
- *           type: string
- *           nullable: true
- */
+// Допоміжна функція для формування відповіді
+function itemToDto(item) {
+  return {
+    id: item.id,
+    inventory_name: item.inventory_name,
+    description: item.description,
+    photoUrl: item.photoFilename ? `/inventory/${item.id}/photo` : null,
+  };
+}
+
+// Swagger конфігурація (схема тут, без окремого великого коментаря)
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
@@ -55,53 +46,52 @@ const swaggerOptions = {
       version: '1.0.0',
       description: 'Simple inventory API for lab work',
     },
+    components: {
+      schemas: {
+        InventoryItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            inventory_name: { type: 'string' },
+            description: { type: 'string' },
+            photoUrl: { type: 'string', nullable: true },
+          },
+        },
+      },
+    },
   },
   apis: [__filename],
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
-
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-let nextId = 1;
-
+// Обмеження методів (405)
 app.all('/register', (req, res, next) => {
   if (req.method === 'POST') return next();
   res.sendStatus(405);
 });
-
-
 app.all('/inventory', (req, res, next) => {
   if (req.method === 'GET') return next();
   res.sendStatus(405);
 });
-
-
 app.all('/inventory/:id', (req, res, next) => {
-  if (req.method === 'GET' || req.method === 'PUT' || req.method === 'DELETE') {
-    return next();
-  }
+  if (['GET', 'PUT', 'DELETE'].includes(req.method)) return next();
   res.sendStatus(405);
 });
-
-
 app.all('/inventory/:id/photo', (req, res, next) => {
-  if (req.method === 'GET' || req.method === 'PUT') {
-    return next();
-  }
+  if (['GET', 'PUT'].includes(req.method)) return next();
   res.sendStatus(405);
 });
-
-
 app.all('/search', (req, res, next) => {
   if (req.method === 'GET') return next();
   res.sendStatus(405);
 });
 
+// Статичні HTML-сторінки (форми)
 app.get('/RegisterForm.html', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'RegisterForm.html'));
 });
-
 app.get('/SearchForm.html', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'SearchForm.html'));
 });
@@ -122,14 +112,7 @@ app.get('/SearchForm.html', (req, res) => {
  *                 $ref: '#/components/schemas/InventoryItem'
  */
 app.get('/inventory', (req, res) => {
-  const result = inventory.map(item => ({
-    id: item.id,
-    inventory_name: item.inventory_name,
-    description: item.description,
-    photoUrl: item.photoFilename ? `/inventory/${item.id}/photo` : null
-  }));
-
-  res.json(result);
+  res.json(inventory.map(itemToDto));
 });
 
 /**
@@ -156,17 +139,10 @@ app.get('/inventory', (req, res) => {
 app.get('/inventory/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const item = inventory.find(i => i.id === id);
-
   if (!item) {
     return res.status(404).json({ error: 'not found' });
   }
-
-  res.json({
-    id: item.id,
-    inventory_name: item.inventory_name,
-    description: item.description,
-    photoUrl: item.photoFilename ? `/inventory/${item.id}/photo` : null
-  });
+  res.json(itemToDto(item));
 });
 
 /**
@@ -204,27 +180,18 @@ app.get('/inventory/:id', (req, res) => {
 app.put('/inventory/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const item = inventory.find(i => i.id === id);
-
   if (!item) {
     return res.status(404).json({ error: 'not found' });
   }
 
   const body = req.body;
-
   if (typeof body.inventory_name === 'string') {
     item.inventory_name = body.inventory_name;
   }
-
   if (typeof body.description === 'string') {
     item.description = body.description;
   }
-
-  res.json({
-    id: item.id,
-    inventory_name: item.inventory_name,
-    description: item.description,
-    photoUrl: item.photoFilename ? `/inventory/${item.id}/photo` : null
-  });
+  res.json(itemToDto(item));
 });
 
 /**
@@ -252,20 +219,16 @@ app.put('/inventory/:id', (req, res) => {
 app.get('/inventory/:id/photo', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const item = inventory.find(i => i.id === id);
-
   if (!item || !item.photoFilename) {
     return res.status(404).json({ error: 'photo not found' });
   }
 
   const filePath = path.resolve(options.cache, item.photoFilename);
-
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'photo not found' });
   }
-
   res.setHeader('Content-Type', 'image/jpeg');
-  const stream = fs.createReadStream(filePath);
-  stream.pipe(res);
+  fs.createReadStream(filePath).pipe(res);
 });
 
 /**
@@ -302,18 +265,15 @@ app.get('/inventory/:id/photo', (req, res) => {
 app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
   const id = parseInt(req.params.id, 10);
   const item = inventory.find(i => i.id === id);
-
   if (!item) {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
     }
     return res.status(404).json({ error: 'not found' });
   }
-
   if (!req.file) {
     return res.status(400).json({ error: 'photo file is required' });
   }
-
   if (item.photoFilename) {
     const oldPath = path.join(options.cache, item.photoFilename);
     if (fs.existsSync(oldPath)) {
@@ -322,13 +282,7 @@ app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
   }
 
   item.photoFilename = path.basename(req.file.path);
-
-  res.json({
-    id: item.id,
-    inventory_name: item.inventory_name,
-    description: item.description,
-    photoUrl: `/inventory/${item.id}/photo`
-  });
+  res.json(itemToDto(item));
 });
 
 /**
@@ -359,13 +313,11 @@ app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
  */
 app.get('/search', (req, res) => {
   const id = parseInt(req.query.id, 10);
-
   if (Number.isNaN(id)) {
     return res.status(400).send('Invalid id');
   }
 
   const item = inventory.find(i => i.id === id);
-
   if (!item) {
     return res.status(404).send('Item not found');
   }
@@ -375,7 +327,6 @@ app.get('/search', (req, res) => {
 
   if (req.query.includePhoto !== undefined && item.photoFilename) {
     const photoUrl = `/inventory/${item.id}/photo`;
-
     if (description) {
       description += '<br>';
     }
@@ -389,7 +340,6 @@ app.get('/search', (req, res) => {
       </p>
     `;
   }
-
   res.send(`
     <!DOCTYPE html>
     <html>
@@ -440,11 +390,9 @@ app.get('/search', (req, res) => {
  *       400:
  *         description: Bad request
  */
-
 app.post('/register', upload.single('photo'), (req, res) => {
   const name = req.body.inventory_name;
   const description = req.body.description || '';
-
   if (!name || name.trim() === '') {
     if (req.file) {
       fs.unlink(req.file.path, () => {});
@@ -456,24 +404,11 @@ app.post('/register', upload.single('photo'), (req, res) => {
     id: nextId++,
     inventory_name: name.trim(),
     description,
-    photoFilename: req.file ? path.basename(req.file.path) : null
+    photoFilename: req.file ? path.basename(req.file.path) : null,
   };
 
   inventory.push(item);
-
-  res.status(201).json({
-    id: item.id,
-    inventory_name: item.inventory_name,
-    description: item.description,
-    photoUrl: item.photoFilename ? `/inventory/${item.id}/photo` : null
-  });
-});
-
-const server = http.createServer(app);
-
-server.listen(options.port, options.host, () => {
-  console.log(`Server running at http://${options.host}:${options.port}/`);
-  console.log(`Cache directory: ${path.resolve(options.cache)}`);
+  res.status(201).json(itemToDto(item));
 });
 
 /**
@@ -500,18 +435,17 @@ server.listen(options.port, options.host, () => {
 app.delete('/inventory/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const index = inventory.findIndex(i => i.id === id);
-
   if (index === -1) {
     return res.status(404).json({ error: 'not found' });
   }
 
   const item = inventory[index];
-
   inventory.splice(index, 1);
+  res.json(itemToDto(item));
+});
 
-  res.json({
-    id: item.id,
-    inventory_name: item.inventory_name,
-    description: item.description
-  });
+const server = http.createServer(app);
+server.listen(options.port, options.host, () => {
+  console.log(`Server running at http://${options.host}:${options.port}/`);
+  console.log(`Cache directory: ${path.resolve(options.cache)}`);
 });
