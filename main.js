@@ -37,7 +37,6 @@ function itemToDto(item) {
   };
 }
 
-// Swagger конфігурація (схема тут, без окремого великого коментаря)
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
