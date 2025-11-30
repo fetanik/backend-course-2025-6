@@ -82,8 +82,9 @@ app.all('/inventory/:id/photo', (req, res, next) => {
   if (['GET', 'PUT'].includes(req.method)) return next();
   res.sendStatus(405);
 });
+// ТЕПЕР /search дозволяє тільки POST (як у методичці)
 app.all('/search', (req, res, next) => {
-  if (req.method === 'GET') return next();
+  if (req.method === 'POST') return next();
   res.sendStatus(405);
 });
 
@@ -287,19 +288,19 @@ app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
 /**
  * @swagger
  * /search:
- *   get:
+ *   post:
  *     summary: Search inventory item by id (HTML response)
- *     parameters:
- *       - in: query
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *       - in: query
- *         name: includePhoto
- *         required: false
- *         schema:
- *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: integer
+ *               has_photo:
+ *                 type: string
  *     responses:
  *       200:
  *         description: HTML page with search result
@@ -310,8 +311,8 @@ app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
  *       404:
  *         description: Item not found
  */
-app.get('/search', (req, res) => {
-  const id = parseInt(req.query.id, 10);
+app.post('/search', (req, res) => {
+  const id = parseInt(req.body.id, 10);
   if (Number.isNaN(id)) {
     return res.status(400).send('Invalid id');
   }
@@ -324,7 +325,7 @@ app.get('/search', (req, res) => {
   let description = item.description || '';
   let photoBlock = '';
 
-  if (req.query.includePhoto !== undefined && item.photoFilename) {
+  if (req.body.has_photo !== undefined && item.photoFilename) {
     const photoUrl = `/inventory/${item.id}/photo`;
     if (description) {
       description += '<br>';
@@ -339,6 +340,7 @@ app.get('/search', (req, res) => {
       </p>
     `;
   }
+
   res.send(`
     <!DOCTYPE html>
     <html>
